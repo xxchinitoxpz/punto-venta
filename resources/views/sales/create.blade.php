@@ -280,7 +280,8 @@
             let productosFiltrados = presentations.filter(pres => {
                 const matchSearch = !searchTerm || 
                     pres.nombre.toLowerCase().includes(searchTerm) ||
-                    (pres.product?.nombre || '').toLowerCase().includes(searchTerm);
+                    (pres.product?.nombre || '').toLowerCase().includes(searchTerm) ||
+                    (pres.barcode || '').toLowerCase().includes(searchTerm);
                 
                 const matchCategoria = !categoriaFiltro || 
                     (pres.product?.categoria_id == categoriaFiltro);
