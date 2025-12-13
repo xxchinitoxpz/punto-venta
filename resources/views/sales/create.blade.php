@@ -20,7 +20,7 @@
                 @csrf
 
                 <!-- Tipo de Comprobante (oculto en el formulario, se puede mostrar en el resumen) -->
-                <input type="hidden" name="tipo_comprobante" id="tipo_comprobante" value="{{ old('tipo_comprobante', 'boleta') }}" required>
+                <input type="hidden" name="tipo_comprobante" id="tipo_comprobante" value="{{ old('tipo_comprobante', 'ticket') }}" required>
 
                 <!-- Sesión de Caja (oculto) -->
                 <input type="hidden" name="sesion_caja_id" value="{{ $session->id }}">
@@ -103,9 +103,9 @@
                                         id="tipo_comprobante_select" 
                                         onchange="document.getElementById('tipo_comprobante').value = this.value"
                                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="boleta" {{ old('tipo_comprobante', 'boleta') == 'boleta' ? 'selected' : '' }}>Boleta</option>
+                                    <option value="boleta" {{ old('tipo_comprobante') == 'boleta' ? 'selected' : '' }}>Boleta</option>
                                     <option value="factura" {{ old('tipo_comprobante') == 'factura' ? 'selected' : '' }}>Factura</option>
-                                    <option value="ticket" {{ old('tipo_comprobante') == 'ticket' ? 'selected' : '' }}>Ticket</option>
+                                    <option value="ticket" {{ old('tipo_comprobante', 'ticket') == 'ticket' ? 'selected' : '' }}>Ticket</option>
                                 </select>
                             </div>
                         </div>
@@ -690,26 +690,45 @@
             // Función para calcular total de pagos
             function calcularTotalPagos() {
             let totalPagado = 0;
+            let totalEfectivo = 0;
             
-            document.querySelectorAll('.monto-pago-input').forEach(input => {
-                totalPagado += parseFloat(input.value) || 0;
+            // Calcular total pagado y total en efectivo
+            document.querySelectorAll('.pago-item').forEach(row => {
+                const montoInput = row.querySelector('.monto-pago-input');
+                const metodoSelect = row.querySelector('select[name*="[metodo_pago]"]');
+                
+                if (montoInput && metodoSelect) {
+                    const monto = parseFloat(montoInput.value) || 0;
+                    totalPagado += monto;
+                    
+                    if (metodoSelect.value === 'efectivo') {
+                        totalEfectivo += monto;
+                    }
+                }
             });
             
             document.getElementById('total-pagado').textContent = `S/ ${totalPagado.toFixed(2)}`;
             
             const totalVenta = parseFloat(document.getElementById('total_venta').value) || 0;
             const diferencia = totalPagado - totalVenta;
+            const vuelto = Math.max(0, diferencia);
             
             const diferenciaElement = document.getElementById('diferencia-pago');
             if (Math.abs(diferencia) < 0.01) {
-                diferenciaElement.textContent = '✓ El total de pagos coincide con el total de la venta.';
-                diferenciaElement.className = 'text-sm text-green-600 font-medium';
+                diferenciaElement.innerHTML = '<span class="text-green-600">✓ El total de pagos coincide con el total de la venta.</span>';
+                diferenciaElement.className = 'text-sm font-medium';
             } else if (diferencia > 0) {
-                diferenciaElement.textContent = `⚠ Sobrepago: S/ ${diferencia.toFixed(2)}`;
-                diferenciaElement.className = 'text-sm text-yellow-600 font-medium';
+                // Hay sobrepago - mostrar vuelto si hay pago en efectivo
+                if (totalEfectivo > 0 && vuelto > 0) {
+                    diferenciaElement.innerHTML = `<span class="text-blue-600 font-semibold">💰 Vuelto: S/ ${vuelto.toFixed(2)}</span>`;
+                    diferenciaElement.className = 'text-sm font-medium';
+                } else {
+                    diferenciaElement.innerHTML = `<span class="text-yellow-600">⚠ Sobrepago: S/ ${diferencia.toFixed(2)} (No hay vuelto - no hay pago en efectivo)</span>`;
+                    diferenciaElement.className = 'text-sm font-medium';
+                }
             } else {
-                diferenciaElement.textContent = `✗ Falta pagar: S/ ${Math.abs(diferencia).toFixed(2)}`;
-                diferenciaElement.className = 'text-sm text-red-600 font-medium';
+                diferenciaElement.innerHTML = `<span class="text-red-600">✗ Falta pagar: S/ ${Math.abs(diferencia).toFixed(2)}</span>`;
+                diferenciaElement.className = 'text-sm font-medium';
             }
         }
 

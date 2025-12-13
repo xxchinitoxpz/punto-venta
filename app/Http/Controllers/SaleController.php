@@ -104,11 +104,14 @@ class SaleController extends Controller
             'pagos.*.referencia' => 'nullable|string|max:255',
         ]);
 
-        // Validar que la suma de pagos sea igual al total_venta
+        // Validar que la suma de pagos sea mayor o igual al total_venta
         $sumaPagos = collect($validated['pagos'])->sum('monto_pagado');
-        if (abs($sumaPagos - $validated['total_venta']) > 0.01) {
-            return back()->withInput()->withErrors(['error' => 'La suma de los pagos debe ser igual al total de la venta.']);
+        if ($sumaPagos < $validated['total_venta'] - 0.01) {
+            return back()->withInput()->withErrors(['error' => 'La suma de los pagos debe ser mayor o igual al total de la venta.']);
         }
+
+        // Calcular vuelto si hay sobrepago
+        $vuelto = max(0, $sumaPagos - $validated['total_venta']);
 
         DB::beginTransaction();
         try {
@@ -221,14 +224,42 @@ class SaleController extends Controller
             }
 
             // Crear pagos y movimientos de caja
-            foreach ($validated['pagos'] as $pago) {
-                // Crear movimiento de caja
+            $totalAsignado = 0;
+            $vueltoTotal = $vuelto;
+            
+            foreach ($validated['pagos'] as $index => $pago) {
+                // Calcular cuánto asignar de este pago al total de la venta
+                $restantePorAsignar = $validated['total_venta'] - $totalAsignado;
+                $montoAAsignar = min($pago['monto_pagado'], $restantePorAsignar);
+                
+                // Calcular vuelto de este pago si es en efectivo y hay sobrepago
+                $vueltoDeEstePago = 0;
+                if ($pago['metodo_pago'] === 'efectivo' && $vueltoTotal > 0) {
+                    // Si este pago tiene sobrepago, calcular el vuelto
+                    $sobrepagoDeEstePago = $pago['monto_pagado'] - $montoAAsignar;
+                    if ($sobrepagoDeEstePago > 0) {
+                        // El vuelto es el mínimo entre el sobrepago de este pago y el vuelto total restante
+                        $vueltoDeEstePago = min($sobrepagoDeEstePago, $vueltoTotal);
+                        $vueltoTotal -= $vueltoDeEstePago;
+                    }
+                }
+                
+                // Crear movimiento de caja (solo se registra el monto asignado al total, no el sobrepago)
+                $descripcion = 'Venta ' . strtoupper($validated['tipo_comprobante']) . ' ' . $serie . '-' . str_pad($correlativo, 8, '0', STR_PAD_LEFT);
+                if ($vueltoDeEstePago > 0) {
+                    $descripcion .= ' (Pago: S/ ' . number_format($pago['monto_pagado'], 2) . ', Vuelto: S/ ' . number_format($vueltoDeEstePago, 2) . ')';
+                } elseif ($vueltoTotal > 0 && $pago['metodo_pago'] === 'efectivo' && $index === count($validated['pagos']) - 1) {
+                    // Si hay vuelto restante y este es el último pago en efectivo, agregarlo aquí
+                    $descripcion .= ' (Pago: S/ ' . number_format($pago['monto_pagado'], 2) . ', Vuelto: S/ ' . number_format($vueltoTotal, 2) . ')';
+                    $vueltoTotal = 0;
+                }
+                
                 $movement = CashBoxMovement::create([
                     'sesion_caja_id' => $session->id,
                     'tipo' => 'ingreso',
-                    'monto' => $pago['monto_pagado'],
+                    'monto' => $montoAAsignar, // Solo el monto que corresponde al total
                     'metodo_pago' => $pago['metodo_pago'],
-                    'descripcion' => 'Venta ' . strtoupper($validated['tipo_comprobante']) . ' ' . $serie . '-' . str_pad($correlativo, 8, '0', STR_PAD_LEFT),
+                    'descripcion' => $descripcion,
                     'origen_type' => Sale::class,
                     'origen_id' => $sale->id,
                 ]);
@@ -237,10 +268,12 @@ class SaleController extends Controller
                 SalePayment::create([
                     'sale_id' => $sale->id,
                     'metodo_pago' => $pago['metodo_pago'],
-                    'monto_pagado' => $pago['monto_pagado'],
+                    'monto_pagado' => $pago['monto_pagado'], // Se guarda el monto pagado completo para referencia
                     'referencia' => $pago['referencia'] ?? null,
                     'cash_box_movement_id' => $movement->id,
                 ]);
+                
+                $totalAsignado += $montoAAsignar;
             }
 
             // Actualizar el correlativo

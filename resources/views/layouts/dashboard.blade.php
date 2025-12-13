@@ -14,7 +14,12 @@
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="font-sans antialiased bg-gray-100" x-data="{ sidebarOpen: window.innerWidth >= 1024 }" x-init="window.addEventListener('resize', () => { if (window.innerWidth >= 1024) sidebarOpen = true; })">
+<body class="font-sans antialiased bg-gray-100" x-data="{ sidebarOpen: false, isFullscreen: false }" x-init="
+    document.addEventListener('fullscreenchange', () => { isFullscreen = !!document.fullscreenElement; });
+    document.addEventListener('webkitfullscreenchange', () => { isFullscreen = !!document.webkitFullscreenElement; });
+    document.addEventListener('mozfullscreenchange', () => { isFullscreen = !!document.mozFullScreenElement; });
+    document.addEventListener('MSFullscreenChange', () => { isFullscreen = !!document.msFullscreenElement; });
+">
     <div class="min-h-screen flex">
         <!-- Overlay para móvil -->
         <div x-show="sidebarOpen" 
@@ -229,6 +234,42 @@
                     </div>
 
                     <div class="flex items-center space-x-4">
+                        <!-- Fullscreen Toggle -->
+                        <button @click="
+                            if (!isFullscreen) {
+                                if (document.documentElement.requestFullscreen) {
+                                    document.documentElement.requestFullscreen();
+                                } else if (document.documentElement.webkitRequestFullscreen) {
+                                    document.documentElement.webkitRequestFullscreen();
+                                } else if (document.documentElement.mozRequestFullScreen) {
+                                    document.documentElement.mozRequestFullScreen();
+                                } else if (document.documentElement.msRequestFullscreen) {
+                                    document.documentElement.msRequestFullscreen();
+                                }
+                            } else {
+                                if (document.exitFullscreen) {
+                                    document.exitFullscreen();
+                                } else if (document.webkitExitFullscreen) {
+                                    document.webkitExitFullscreen();
+                                } else if (document.mozCancelFullScreen) {
+                                    document.mozCancelFullScreen();
+                                } else if (document.msExitFullscreen) {
+                                    document.msExitFullscreen();
+                                }
+                            }
+                        " 
+                                class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                                title="Pantalla completa">
+                            <!-- Icono expandir (cuando NO está en pantalla completa) -->
+                            <svg x-show="!isFullscreen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                            <!-- Icono contraer (cuando SÍ está en pantalla completa) -->
+                            <svg x-show="isFullscreen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+
                         <!-- Notifications (placeholder) -->
                         <button class="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
