@@ -78,6 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Rutas para Ventas
     Route::resource('sales', SaleController::class);
+    Route::post('sales/consultar-documento', [SaleController::class, 'consultarDocumento'])->name('sales.consultarDocumento');
 });
 
 Route::middleware('auth')->group(function () {

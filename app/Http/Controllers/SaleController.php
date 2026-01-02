@@ -13,6 +13,7 @@ use App\Models\Promotion;
 use App\Models\Inventory;
 use App\Models\Client;
 use App\Models\Category;
+use App\Services\ApiPeruService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -88,6 +89,7 @@ class SaleController extends Controller
         $validated = $request->validate([
             'tipo_comprobante' => 'required|in:factura,boleta,ticket',
             'cliente_id' => 'nullable|exists:clients,id',
+            'numero_documento' => 'nullable|string|max:11',
             'total_gravado' => 'required|numeric|min:0',
             'total_igv' => 'required|numeric|min:0',
             'total_venta' => 'required|numeric|min:0.01',
@@ -143,6 +145,57 @@ class SaleController extends Controller
                 throw new \Exception('Ya existe una venta con este número de comprobante. Intenta nuevamente.');
             }
 
+            // Manejar cliente según tipo de comprobante
+            $clienteId = null;
+            if ($validated['tipo_comprobante'] !== 'ticket') {
+                if (isset($validated['numero_documento']) && !empty($validated['numero_documento'])) {
+                    // Buscar cliente por número de documento
+                    $tipoDocumento = $validated['tipo_comprobante'] === 'boleta' ? 'DNI' : 'RUC';
+                    $cliente = Client::where('tipo_documento', $tipoDocumento)
+                        ->where('nro_documento', $validated['numero_documento'])
+                        ->first();
+                    
+                    if (!$cliente) {
+                        // Si no existe, intentar consultar la API y crear el cliente
+                        $apiService = new ApiPeruService();
+                        $datosApi = null;
+                        
+                        if ($tipoDocumento === 'DNI') {
+                            $datosApi = $apiService->consultarDni($validated['numero_documento']);
+                            if ($datosApi) {
+                                $cliente = Client::create([
+                                    'nombre_completo' => $datosApi['nombre_completo'] ?? '',
+                                    'tipo_documento' => 'DNI',
+                                    'nro_documento' => $datosApi['numero'] ?? $validated['numero_documento'],
+                                    'telefono' => null,
+                                    'email' => null,
+                                    'direccion' => null,
+                                ]);
+                            }
+                        } else {
+                            $datosApi = $apiService->consultarRuc($validated['numero_documento']);
+                            if ($datosApi) {
+                                $cliente = Client::create([
+                                    'nombre_completo' => $datosApi['nombre_o_razon_social'] ?? '',
+                                    'tipo_documento' => 'RUC',
+                                    'nro_documento' => $datosApi['ruc'] ?? $validated['numero_documento'],
+                                    'telefono' => null,
+                                    'email' => null,
+                                    'direccion' => $datosApi['direccion_completa'] ?? ($datosApi['direccion'] ?? null),
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    if ($cliente) {
+                        $clienteId = $cliente->id;
+                    }
+                }
+            } else {
+                // Para ticket, usar cliente_id si viene, sino null (cliente genérico)
+                $clienteId = $validated['cliente_id'] ?? null;
+            }
+
             // Crear la venta
             $sale = Sale::create([
                 'tipo_comprobante' => $validated['tipo_comprobante'],
@@ -151,7 +204,7 @@ class SaleController extends Controller
                 'total_gravado' => $validated['total_gravado'],
                 'total_igv' => $validated['total_igv'],
                 'total_venta' => $validated['total_venta'],
-                'cliente_id' => $validated['cliente_id'] ?? null,
+                'cliente_id' => $clienteId,
                 'usuario_id' => $user->id,
                 'sesion_caja_id' => $session->id,
                 'estado' => 'registrada',
@@ -350,5 +403,66 @@ class SaleController extends Controller
             DB::rollBack();
             return back()->withErrors(['error' => 'Error al anular la venta: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Consultar DNI o RUC desde la API
+     */
+    public function consultarDocumento(Request $request)
+    {
+        $request->validate([
+            'tipo' => 'required|in:dni,ruc',
+            'numero' => 'required|string|max:11',
+        ]);
+
+        $apiService = new ApiPeruService();
+        $datos = null;
+
+        if ($request->tipo === 'dni') {
+            $datos = $apiService->consultarDni($request->numero);
+        } else {
+            $datos = $apiService->consultarRuc($request->numero);
+        }
+
+        if (!$datos) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo consultar el documento. Verifique el número ingresado.'
+            ], 404);
+        }
+
+        // Verificar si el cliente ya existe en la base de datos
+        $tipoDocumento = $request->tipo === 'dni' ? 'DNI' : 'RUC';
+        $numeroDocumento = $request->tipo === 'dni' 
+            ? ($datos['numero'] ?? $request->numero)
+            : ($datos['ruc'] ?? $request->numero);
+        
+        $cliente = Client::where('tipo_documento', $tipoDocumento)
+            ->where('nro_documento', $numeroDocumento)
+            ->first();
+
+        // Preparar respuesta según tipo
+        if ($request->tipo === 'dni') {
+            $response = [
+                'success' => true,
+                'data' => $datos,
+                'cliente_existe' => $cliente !== null,
+                'cliente_id' => $cliente ? $cliente->id : null,
+                'cliente_nombre' => $cliente ? $cliente->nombre_completo : ($datos['nombre_completo'] ?? ''),
+                'numero_documento' => $datos['numero'] ?? $request->numero,
+            ];
+        } else {
+            $response = [
+                'success' => true,
+                'data' => $datos,
+                'cliente_existe' => $cliente !== null,
+                'cliente_id' => $cliente ? $cliente->id : null,
+                'cliente_nombre' => $cliente ? $cliente->nombre_completo : ($datos['nombre_o_razon_social'] ?? ''),
+                'numero_documento' => $datos['ruc'] ?? $request->numero,
+                'direccion' => $datos['direccion_completa'] ?? ($datos['direccion'] ?? ''),
+            ];
+        }
+
+        return response()->json($response);
     }
 }

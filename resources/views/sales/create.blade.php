@@ -77,36 +77,82 @@
                         <!-- Cliente -->
                         <div class="bg-white border border-gray-300 rounded-lg p-4">
                             <h3 class="text-lg font-semibold text-gray-700 mb-4">Cliente</h3>
-                            <div>
-                                <label for="cliente_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Cliente (Opcional)
-                                </label>
-                                <select name="cliente_id" 
-                                        id="cliente_id"
-                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="">Cliente Genérico</option>
-                                    @foreach($clients as $client)
-                                        <option value="{{ $client->id }}" {{ old('cliente_id') == $client->id ? 'selected' : '' }}>
-                                            {{ $client->nombre_completo }} - {{ $client->tipo_documento }}: {{ $client->nro_documento }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @error('cliente_id')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-                            <div class="mt-4">
+                            
+                            <!-- Tipo de Comprobante -->
+                            <div class="mb-4">
                                 <label for="tipo_comprobante_select" class="block text-sm font-medium text-gray-700 mb-2">
                                     Tipo de Comprobante <span class="text-red-500">*</span>
                                 </label>
                                 <select name="tipo_comprobante_select" 
                                         id="tipo_comprobante_select" 
-                                        onchange="document.getElementById('tipo_comprobante').value = this.value"
+                                        onchange="cambiarTipoComprobante(this.value)"
                                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="ticket" {{ old('tipo_comprobante', 'ticket') == 'ticket' ? 'selected' : '' }}>Ticket</option>
                                     <option value="boleta" {{ old('tipo_comprobante') == 'boleta' ? 'selected' : '' }}>Boleta</option>
                                     <option value="factura" {{ old('tipo_comprobante') == 'factura' ? 'selected' : '' }}>Factura</option>
-                                    <option value="ticket" {{ old('tipo_comprobante', 'ticket') == 'ticket' ? 'selected' : '' }}>Ticket</option>
                                 </select>
+                            </div>
+
+                            <!-- Cliente Genérico (solo para Ticket) -->
+                            <div id="cliente-generico-container">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cliente
+                                </label>
+                                <div class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
+                                    Cliente Genérico
+                                </div>
+                                <input type="hidden" name="cliente_id" id="cliente_id" value="">
+                            </div>
+
+                            <!-- Input DNI/RUC (solo para Boleta/Factura) -->
+                            <div id="cliente-documento-container" style="display: none;">
+                                <label for="numero_documento" class="block text-sm font-medium text-gray-700 mb-2">
+                                    <span id="label-documento">DNI</span> <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <input type="text" 
+                                           name="numero_documento" 
+                                           id="numero_documento"
+                                           placeholder="Ingrese DNI o RUC"
+                                           maxlength="11"
+                                           oninput="consultarDocumento(this.value)"
+                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <div id="loading-documento" class="absolute right-3 top-2.5 hidden">
+                                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500" id="hint-documento">
+                                    Ingrese el número de documento del cliente
+                                </p>
+                                
+                                <!-- Información del cliente consultado -->
+                                <div id="cliente-info-container" class="mt-3 hidden">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                        <div class="flex items-start justify-between">
+                                            <div class="flex-1">
+                                                <p class="text-sm font-semibold text-gray-800" id="cliente-nombre-info"></p>
+                                                <p class="text-xs text-gray-600 mt-1" id="cliente-documento-info"></p>
+                                                <p class="text-xs text-gray-600 mt-1" id="cliente-direccion-info"></p>
+                                                <p class="text-xs text-green-600 mt-1 font-medium" id="cliente-existe-info"></p>
+                                            </div>
+                                            <button type="button" 
+                                                    onclick="cerrarInfoCliente()"
+                                                    class="text-gray-400 hover:text-gray-600">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                @error('numero_documento')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                @error('cliente_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
@@ -733,6 +779,177 @@
             }
         }
 
+            // Variable para almacenar el cliente consultado
+            let clienteConsultado = null;
+            let timeoutConsulta = null;
+
+            // Función para cambiar tipo de comprobante
+            function cambiarTipoComprobante(tipo) {
+                // Actualizar el campo oculto
+                document.getElementById('tipo_comprobante').value = tipo;
+                
+                const clienteGenericoContainer = document.getElementById('cliente-generico-container');
+                const clienteDocumentoContainer = document.getElementById('cliente-documento-container');
+                const numeroDocumentoInput = document.getElementById('numero_documento');
+                const labelDocumento = document.getElementById('label-documento');
+                const hintDocumento = document.getElementById('hint-documento');
+                
+                // Cerrar info del cliente si está abierta
+                cerrarInfoCliente();
+                clienteConsultado = null;
+                
+                if (tipo === 'ticket') {
+                    // Mostrar Cliente Genérico, ocultar input DNI/RUC
+                    clienteGenericoContainer.style.display = 'block';
+                    clienteDocumentoContainer.style.display = 'none';
+                    document.getElementById('cliente_id').value = '';
+                    numeroDocumentoInput.value = '';
+                    numeroDocumentoInput.removeAttribute('required');
+                } else {
+                    // Ocultar Cliente Genérico, mostrar input DNI/RUC
+                    clienteGenericoContainer.style.display = 'none';
+                    clienteDocumentoContainer.style.display = 'block';
+                    numeroDocumentoInput.setAttribute('required', 'required');
+                    
+                    // Cambiar label según tipo de comprobante
+                    if (tipo === 'boleta') {
+                        labelDocumento.textContent = 'DNI';
+                        hintDocumento.textContent = 'Ingrese el DNI del cliente (8 dígitos)';
+                        numeroDocumentoInput.setAttribute('maxlength', '8');
+                        numeroDocumentoInput.setAttribute('pattern', '[0-9]{8}');
+                    } else if (tipo === 'factura') {
+                        labelDocumento.textContent = 'RUC';
+                        hintDocumento.textContent = 'Ingrese el RUC del cliente (11 dígitos)';
+                        numeroDocumentoInput.setAttribute('maxlength', '11');
+                        numeroDocumentoInput.setAttribute('pattern', '[0-9]{11}');
+                    }
+                }
+            }
+
+            // Función para consultar documento
+            function consultarDocumento(numero) {
+                // Limpiar timeout anterior
+                if (timeoutConsulta) {
+                    clearTimeout(timeoutConsulta);
+                }
+                
+                // Ocultar info anterior
+                cerrarInfoCliente();
+                clienteConsultado = null;
+                
+                // Validar que tenga la longitud correcta
+                const tipoComprobante = document.getElementById('tipo_comprobante_select').value;
+                const tipoDocumento = tipoComprobante === 'boleta' ? 'dni' : 'ruc';
+                const longitudMinima = tipoDocumento === 'dni' ? 8 : 11;
+                
+                if (!numero || numero.length < longitudMinima) {
+                    return;
+                }
+                
+                // Mostrar loading
+                const loadingElement = document.getElementById('loading-documento');
+                loadingElement.classList.remove('hidden');
+                
+                // Consultar después de un pequeño delay para evitar consultas excesivas
+                timeoutConsulta = setTimeout(() => {
+                    const url = '{{ route("sales.consultarDocumento") }}';
+                    const token = '{{ csrf_token() }}';
+                    
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            tipo: tipoDocumento,
+                            numero: numero
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        loadingElement.classList.add('hidden');
+                        
+                        if (data.success) {
+                            clienteConsultado = data;
+                            mostrarInfoCliente(data);
+                        } else {
+                            mostrarErrorCliente(data.message || 'No se pudo consultar el documento');
+                        }
+                    })
+                    .catch(error => {
+                        loadingElement.classList.add('hidden');
+                        console.error('Error:', error);
+                        mostrarErrorCliente('Error al consultar el documento. Intente nuevamente.');
+                    });
+                }, 500); // Esperar 500ms después de que el usuario deje de escribir
+            }
+
+            // Función para mostrar información del cliente
+            function mostrarInfoCliente(data) {
+                const container = document.getElementById('cliente-info-container');
+                const nombreInfo = document.getElementById('cliente-nombre-info');
+                const documentoInfo = document.getElementById('cliente-documento-info');
+                const direccionInfo = document.getElementById('cliente-direccion-info');
+                const existeInfo = document.getElementById('cliente-existe-info');
+                
+                const tipoComprobante = document.getElementById('tipo_comprobante_select').value;
+                const tipoDoc = tipoComprobante === 'boleta' ? 'DNI' : 'RUC';
+                
+                nombreInfo.textContent = data.cliente_nombre || 'N/A';
+                documentoInfo.textContent = `${tipoDoc}: ${data.numero_documento || 'N/A'}`;
+                
+                if (data.direccion) {
+                    direccionInfo.textContent = `Dirección: ${data.direccion}`;
+                    direccionInfo.style.display = 'block';
+                } else {
+                    direccionInfo.style.display = 'none';
+                }
+                
+                if (data.cliente_existe) {
+                    existeInfo.textContent = '✓ Cliente ya existe en el sistema';
+                    existeInfo.className = 'text-xs text-green-600 mt-1 font-medium';
+                } else {
+                    existeInfo.textContent = '⚠ Cliente nuevo - se creará automáticamente';
+                    existeInfo.className = 'text-xs text-yellow-600 mt-1 font-medium';
+                }
+                
+                container.classList.remove('hidden');
+            }
+
+            // Función para mostrar error
+            function mostrarErrorCliente(mensaje) {
+                const container = document.getElementById('cliente-info-container');
+                const nombreInfo = document.getElementById('cliente-nombre-info');
+                const documentoInfo = document.getElementById('cliente-documento-info');
+                const direccionInfo = document.getElementById('cliente-direccion-info');
+                const existeInfo = document.getElementById('cliente-existe-info');
+                
+                nombreInfo.textContent = 'Error';
+                documentoInfo.textContent = mensaje;
+                direccionInfo.style.display = 'none';
+                existeInfo.style.display = 'none';
+                container.classList.remove('hidden');
+                container.querySelector('.bg-blue-50').className = 'bg-red-50 border border-red-200 rounded-lg p-3';
+            }
+
+            // Función para cerrar info del cliente
+            function cerrarInfoCliente() {
+                const container = document.getElementById('cliente-info-container');
+                container.classList.add('hidden');
+                const bgElement = container.querySelector('.bg-red-50, .bg-blue-50');
+                if (bgElement) {
+                    bgElement.className = 'bg-blue-50 border border-blue-200 rounded-lg p-3';
+                }
+                document.getElementById('cliente-direccion-info').style.display = 'block';
+                document.getElementById('cliente-existe-info').style.display = 'block';
+            }
+
+            // Inicializar según el valor por defecto
+            const tipoInicial = document.getElementById('tipo_comprobante_select').value;
+            cambiarTipoComprobante(tipoInicial);
+
             // Exponer funciones al scope global para que los onclick puedan accederlas
             window.filtrarPorCategoria = filtrarPorCategoria;
             window.agregarAlCarrito = agregarAlCarrito;
@@ -742,6 +959,9 @@
             window.actualizarCantidad = actualizarCantidad;
             window.actualizarDescuento = actualizarDescuento;
             window.calcularTotalPagos = calcularTotalPagos;
+            window.cambiarTipoComprobante = cambiarTipoComprobante;
+            window.consultarDocumento = consultarDocumento;
+            window.cerrarInfoCliente = cerrarInfoCliente;
 
             // Validar antes de enviar
             document.getElementById('saleForm').addEventListener('submit', function(e) {

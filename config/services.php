@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'apiperu' => [
+        'token' => env('APIPERU_TOKEN'),
+        'url_dni' => env('APIPERU_URL_DNI', 'https://apiperu.dev/api/dni'),
+        'url_ruc' => env('APIPERU_URL_RUC', 'https://apiperu.dev/api/ruc'),
+    ],
+
 ];
