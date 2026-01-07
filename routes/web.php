@@ -14,6 +14,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\CashBoxController;
+use App\Http\Controllers\greenter\InvoiceController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\SaleController;
 use Illuminate\Support\Facades\Route;
@@ -79,6 +80,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Rutas para Ventas
     Route::resource('sales', SaleController::class);
     Route::post('sales/consultar-documento', [SaleController::class, 'consultarDocumento'])->name('sales.consultarDocumento');
+
+    // Rutas para Facturador
+    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::post('invoices/send', [InvoiceController::class, 'send'])->name('invoices.send');
+
 });
 
 Route::middleware('auth')->group(function () {
