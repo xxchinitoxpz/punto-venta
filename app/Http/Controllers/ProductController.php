@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Presentation;
 use App\Models\Category;
 use App\Models\Brand;
+use App\Models\UnitSunat;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -30,8 +31,9 @@ class ProductController extends Controller
     {
         $categories = Category::orderBy('nombre')->get();
         $brands = Brand::orderBy('nombre')->get();
+        $unitSunats = UnitSunat::orderBy('description')->get();
         
-        return view('products.form', compact('categories', 'brands'));
+        return view('products.form', compact('categories', 'brands', 'unitSunats'));
     }
 
     /**
@@ -49,6 +51,8 @@ class ProductController extends Controller
             'presentaciones.*.barcode' => 'required|string|max:255|unique:presentations,barcode',
             'presentaciones.*.precio_venta' => 'required|numeric|min:0',
             'presentaciones.*.unidades' => 'required|numeric|min:0.01',
+            'presentaciones.*.unit_sunat_id' => 'nullable|exists:unit_sunat,id',
+            'presentaciones.*.tipAfeIgv' => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
@@ -67,6 +71,8 @@ class ProductController extends Controller
                     'barcode' => $presentacionData['barcode'],
                     'precio_venta' => $presentacionData['precio_venta'],
                     'unidades' => $presentacionData['unidades'],
+                    'unit_sunat_id' => $presentacionData['unit_sunat_id'] ?? null,
+                    'tipAfeIgv' => $presentacionData['tipAfeIgv'] ?? '10',
                 ]);
             }
 
@@ -97,8 +103,9 @@ class ProductController extends Controller
         $product->load('presentations');
         $categories = Category::orderBy('nombre')->get();
         $brands = Brand::orderBy('nombre')->get();
+        $unitSunats = UnitSunat::orderBy('description')->get();
         
-        return view('products.form', compact('product', 'categories', 'brands'));
+        return view('products.form', compact('product', 'categories', 'brands', 'unitSunats'));
     }
 
     /**
@@ -117,6 +124,8 @@ class ProductController extends Controller
             'presentaciones.*.barcode' => 'required_with:presentaciones|string|max:255',
             'presentaciones.*.precio_venta' => 'required_with:presentaciones|numeric|min:0',
             'presentaciones.*.unidades' => 'required_with:presentaciones|numeric|min:0.01',
+            'presentaciones.*.unit_sunat_id' => 'nullable|exists:unit_sunat,id',
+            'presentaciones.*.tipAfeIgv' => 'nullable|string|max:255',
             'presentaciones_eliminar' => 'nullable|array',
             'presentaciones_eliminar.*' => 'exists:presentations,id',
         ]);
@@ -159,6 +168,8 @@ class ProductController extends Controller
                                 'barcode' => $presentacionData['barcode'],
                                 'precio_venta' => $presentacionData['precio_venta'],
                                 'unidades' => $presentacionData['unidades'],
+                                'unit_sunat_id' => $presentacionData['unit_sunat_id'] ?? null,
+                                'tipAfeIgv' => $presentacionData['tipAfeIgv'] ?? '10',
                             ]);
                         }
                     } else {
@@ -174,6 +185,8 @@ class ProductController extends Controller
                             'barcode' => $presentacionData['barcode'],
                             'precio_venta' => $presentacionData['precio_venta'],
                             'unidades' => $presentacionData['unidades'],
+                            'unit_sunat_id' => $presentacionData['unit_sunat_id'] ?? null,
+                            'tipAfeIgv' => $presentacionData['tipAfeIgv'] ?? '10',
                         ]);
                     }
                 }

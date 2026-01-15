@@ -119,15 +119,23 @@
                         @if(isset($product) && $product->presentations->count() > 0)
                             @foreach($product->presentations as $index => $presentation)
                                 <div class="presentacion-item border border-gray-300 rounded-lg p-4 bg-gray-50" data-presentacion-id="{{ $presentation->id }}">
-                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                                         <input type="hidden" name="presentaciones[{{ $index }}][id]" value="{{ $presentation->id }}">
+                                        <input type="hidden" name="presentaciones[{{ $index }}][nombre]" id="nombre_{{ $index }}" value="{{ old("presentaciones.$index.nombre", $presentation->nombre) }}" required>
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
-                                            <input type="text" 
-                                                   name="presentaciones[{{ $index }}][nombre]" 
-                                                   value="{{ old("presentaciones.$index.nombre", $presentation->nombre) }}" 
-                                                   required
-                                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Presentación <span class="text-red-500">*</span></label>
+                                            <select name="presentaciones[{{ $index }}][unit_sunat_id]" 
+                                                    onchange="actualizarNombre(this, {{ $index }})"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg unit-sunat-select" required>
+                                                <option value="">Seleccione una presentación</option>
+                                                @foreach($unitSunats as $unitSunat)
+                                                    <option value="{{ $unitSunat->id }}" 
+                                                            data-description="{{ $unitSunat->description }}"
+                                                            {{ old("presentaciones.$index.unit_sunat_id", $presentation->unit_sunat_id) == $unitSunat->id ? 'selected' : '' }}>
+                                                        {{ $unitSunat->description }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700 mb-1">Código de Barras <span class="text-red-500">*</span></label>
@@ -149,13 +157,20 @@
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700 mb-1">Unidades <span class="text-red-500">*</span></label>
+                                            <input type="number" 
+                                                   name="presentaciones[{{ $index }}][unidades]" 
+                                                   value="{{ old("presentaciones.$index.unidades", $presentation->unidades) }}" 
+                                                   step="0.01" 
+                                                   min="0.01" 
+                                                   required
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo Afectación IGV</label>
                                             <div class="flex items-center space-x-2">
-                                                <input type="number" 
-                                                       name="presentaciones[{{ $index }}][unidades]" 
-                                                       value="{{ old("presentaciones.$index.unidades", $presentation->unidades) }}" 
-                                                       step="0.01" 
-                                                       min="0.01" 
-                                                       required
+                                                <input type="text" 
+                                                       name="presentaciones[{{ $index }}][tipAfeIgv]" 
+                                                       value="{{ old("presentaciones.$index.tipAfeIgv", $presentation->tipAfeIgv ?? '10') }}" 
                                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                                 <button type="button" 
                                                         onclick="eliminarPresentacion(this, {{ $presentation->id }})" 
@@ -170,15 +185,23 @@
                         @else
                             <!-- Primera presentación para creación -->
                             <div class="presentacion-item border border-gray-300 rounded-lg p-4 bg-gray-50">
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                                     <input type="hidden" name="presentaciones[0][id]" value="">
+                                    <input type="hidden" name="presentaciones[0][nombre]" id="nombre_0" value="{{ old('presentaciones.0.nombre', '') }}" required>
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
-                                        <input type="text" 
-                                               name="presentaciones[0][nombre]" 
-                                               value="{{ old('presentaciones.0.nombre', '') }}" 
-                                               required
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Presentación <span class="text-red-500">*</span></label>
+                                        <select name="presentaciones[0][unit_sunat_id]" 
+                                                onchange="actualizarNombre(this, 0)"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg unit-sunat-select" required>
+                                            <option value="">Seleccione una presentación</option>
+                                            @foreach($unitSunats as $unitSunat)
+                                                <option value="{{ $unitSunat->id }}" 
+                                                        data-description="{{ $unitSunat->description }}"
+                                                        {{ old('presentaciones.0.unit_sunat_id') == $unitSunat->id ? 'selected' : '' }}>
+                                                    {{ $unitSunat->description }}
+                                                </option>
+                                            @endforeach
+                                        </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Código de Barras <span class="text-red-500">*</span></label>
@@ -208,6 +231,13 @@
                                                required
                                                class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                     </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo Afectación IGV</label>
+                                        <input type="text" 
+                                               name="presentaciones[0][tipAfeIgv]" 
+                                               value="{{ old('presentaciones.0.tipAfeIgv', '10') }}" 
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                    </div>
                                 </div>
                             </div>
                         @endif
@@ -233,20 +263,33 @@
     <script>
         let presentacionIndex = {{ isset($product) && $product->presentations->count() > 0 ? $product->presentations->count() : 1 }};
         let presentacionesAEliminar = [];
+        const unitSunats = @json($unitSunats);
+
+        function actualizarNombre(select, index) {
+            const selectedOption = select.options[select.selectedIndex];
+            const description = selectedOption.getAttribute('data-description');
+            const nombreInput = document.getElementById('nombre_' + index);
+            if (nombreInput && description) {
+                nombreInput.value = description;
+            }
+        }
 
         function agregarPresentacion() {
             const container = document.getElementById('presentaciones-container');
             const nuevaPresentacion = document.createElement('div');
             nuevaPresentacion.className = 'presentacion-item border border-gray-300 rounded-lg p-4 bg-gray-50';
             nuevaPresentacion.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <input type="hidden" name="presentaciones[${presentacionIndex}][id]" value="">
+                    <input type="hidden" name="presentaciones[${presentacionIndex}][nombre]" id="nombre_${presentacionIndex}" value="" required>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre <span class="text-red-500">*</span></label>
-                        <input type="text" 
-                               name="presentaciones[${presentacionIndex}][nombre]" 
-                               required
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Presentación <span class="text-red-500">*</span></label>
+                        <select name="presentaciones[${presentacionIndex}][unit_sunat_id]" 
+                                onchange="actualizarNombre(this, ${presentacionIndex})"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg unit-sunat-select" required>
+                            <option value="">Seleccione una presentación</option>
+                            ${unitSunats.map(unit => `<option value="${unit.id}" data-description="${unit.description}">${unit.description}</option>`).join('')}
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Código de Barras <span class="text-red-500">*</span></label>
@@ -266,13 +309,20 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Unidades <span class="text-red-500">*</span></label>
+                        <input type="number" 
+                               name="presentaciones[${presentacionIndex}][unidades]" 
+                               value="1" 
+                               step="0.01" 
+                               min="0.01" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo Afectación IGV</label>
                         <div class="flex items-center space-x-2">
-                            <input type="number" 
-                                   name="presentaciones[${presentacionIndex}][unidades]" 
-                                   value="1" 
-                                   step="0.01" 
-                                   min="0.01" 
-                                   required
+                            <input type="text" 
+                                   name="presentaciones[${presentacionIndex}][tipAfeIgv]" 
+                                   value="10" 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                             <button type="button" 
                                     onclick="eliminarPresentacion(this)" 
@@ -305,6 +355,21 @@
             
             item.remove();
         }
+
+        // Inicializar nombres de presentaciones existentes al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            const selects = document.querySelectorAll('.unit-sunat-select');
+            selects.forEach((select) => {
+                if (select.value) {
+                    // Obtener el índice del nombre del select (presentaciones[X][unit_sunat_id])
+                    const match = select.name.match(/presentaciones\[(\d+)\]/);
+                    if (match) {
+                        const index = match[1];
+                        actualizarNombre(select, index);
+                    }
+                }
+            });
+        });
     </script>
 @endsection
 

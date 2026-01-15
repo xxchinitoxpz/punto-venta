@@ -14,6 +14,8 @@ class Presentation extends Model
         'barcode',
         'precio_venta',
         'unidades',
+        'unit_sunat_id',
+        'tipAfeIgv',
     ];
 
     protected $casts = [
@@ -27,6 +29,14 @@ class Presentation extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Relación con UnitSunat
+     */
+    public function unitSunat(): BelongsTo
+    {
+        return $this->belongsTo(UnitSunat::class, 'unit_sunat_id');
     }
 
     /**

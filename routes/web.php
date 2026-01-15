@@ -84,6 +84,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Rutas para Facturador
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::post('invoices/send', [InvoiceController::class, 'send'])->name('invoices.send');
+    Route::post('invoices/xml', [InvoiceController::class, 'xml'])->name('invoices.xml');
+
 
 });
 
