@@ -26,7 +26,7 @@ class SunatService
     public function getSee($company)
     {
         if (!$company->cert_path || !Storage::disk('public')->exists($company->cert_path)) {
-            return back()->with('error', 'No se encontró el certificado digital');
+            throw new \Exception('No se encontró el certificado digital');
         }
 
         $see = new See();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\ApiPeruService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -32,8 +33,15 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'razon_social' => 'required|string|max:255',
+            'nombre_comercial' => 'nullable|string|max:255',
             'ruc' => 'required|string|max:20',
             'direccion' => 'required|string|max:255',
+            'ubigueo' => 'nullable|string|max:6',
+            'departamento' => 'nullable|string|max:255',
+            'provincia' => 'nullable|string|max:255',
+            'distrito' => 'nullable|string|max:255',
+            'urbanizacion' => 'nullable|string|max:255',
+            'cod_local' => 'nullable|string|max:4',
             'logo_path' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'sol_user' => 'required|string|max:255',
             'sol_pass' => 'required|string|max:255',
@@ -86,8 +94,15 @@ class CompanyController extends Controller
     {
         $validated = $request->validate([
             'razon_social' => 'required|string|max:255',
+            'nombre_comercial' => 'nullable|string|max:255',
             'ruc' => 'required|string|max:20',
             'direccion' => 'required|string|max:255',
+            'ubigueo' => 'nullable|string|max:6',
+            'departamento' => 'nullable|string|max:255',
+            'provincia' => 'nullable|string|max:255',
+            'distrito' => 'nullable|string|max:255',
+            'urbanizacion' => 'nullable|string|max:255',
+            'cod_local' => 'nullable|string|max:4',
             'logo_path' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'sol_user' => 'required|string|max:255',
             'sol_pass' => 'nullable|string|max:255',
@@ -152,5 +167,41 @@ class CompanyController extends Controller
         $company->delete();
         session()->flash('success', 'Empresa eliminada exitosamente.');
         return redirect()->route('companies.index');
+    }
+
+    /**
+     * Consultar RUC en API Peru
+     */
+    public function consultarRuc(Request $request)
+    {
+        $request->validate([
+            'ruc' => 'required|string|max:11',
+        ]);
+
+        $apiService = new ApiPeruService();
+        $datos = $apiService->consultarRuc($request->ruc);
+
+        if (!$datos) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró información para el RUC proporcionado.'
+            ], 404);
+        }
+
+        // Mapear los datos de la API a los campos del formulario
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'ruc' => $datos['ruc'] ?? $request->ruc,
+                'razon_social' => $datos['nombre_o_razon_social'] ?? '',
+                'direccion' => $datos['direccion'] ?? '',
+                'ubigueo' => $datos['ubigeo_sunat'] ?? '',
+                'departamento' => $datos['departamento'] ?? '',
+                'provincia' => $datos['provincia'] ?? '',
+                'distrito' => $datos['distrito'] ?? '',
+                'urbanizacion' => '-',
+                'cod_local' => '0000',
+            ]
+        ]);
     }
 }

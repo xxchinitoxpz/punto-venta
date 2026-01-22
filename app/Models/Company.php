@@ -9,8 +9,15 @@ class Company extends Model
 {
     protected $fillable = [
         'razon_social',
+        'nombre_comercial',
         'ruc',
         'direccion',
+        'ubigueo',
+        'departamento',
+        'provincia',
+        'distrito',
+        'urbanizacion',
+        'cod_local',
         'logo_path',
         'sol_user',
         'sol_pass',

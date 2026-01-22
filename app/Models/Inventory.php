@@ -25,4 +25,19 @@ class Inventory extends Model
     {
         return $this->belongsTo(Product::class, 'producto_id');
     }
+
+    /**
+     * Boot del modelo - Eventos
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Eliminar automáticamente cuando el stock llegue a 0
+        static::saved(function ($inventory) {
+            if ($inventory->stock <= 0) {
+                $inventory->delete();
+            }
+        });
+    }
 }

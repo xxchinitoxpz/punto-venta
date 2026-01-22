@@ -67,4 +67,12 @@ class Sale extends Model
     {
         return $this->hasMany(SalePayment::class);
     }
+
+    /**
+     * Relación con SunatResponse
+     */
+    public function sunatResponse(): HasMany
+    {
+        return $this->hasMany(SunatResponse::class);
+    }
 }

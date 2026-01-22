@@ -70,13 +70,24 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex items-center space-x-2">
+                                        @if(in_array($sale->tipo_comprobante, ['factura', 'boleta']))
+                                            <a href="{{ route('sales.pdf', $sale) }}" target="_blank" class="text-blue-600 hover:text-blue-900" title="Ver PDF">
+                                                PDF
+                                            </a>
+                                        @endif
                                         @can('anular ventas')
                                             @if($sale->estado === 'registrada')
-                                                <form action="{{ route('sales.destroy', $sale) }}" method="POST" class="inline" onsubmit="return confirm('¿Estás seguro de que deseas anular esta venta? Se revertirá el stock y los movimientos de caja.');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-red-600 hover:text-red-900">Anular</button>
-                                                </form>
+                                                @php
+                                                    $diasTranscurridos = $sale->created_at->diffInDays(now());
+                                                    $puedeAnular = $diasTranscurridos <= 3;
+                                                @endphp
+                                                @if($puedeAnular)
+                                                    <form action="{{ route('sales.destroy', $sale) }}" method="POST" class="inline" onsubmit="return confirm('¿Estás seguro de que deseas anular esta venta? Se revertirá el stock y los movimientos de caja.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="text-red-600 hover:text-red-900">Anular</button>
+                                                    </form>
+                                                @endif
                                             @else
                                                 <span class="text-gray-400">Anulada</span>
                                             @endif

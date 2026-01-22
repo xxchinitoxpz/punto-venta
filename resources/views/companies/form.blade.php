@@ -41,17 +41,46 @@
                         @enderror
                     </div>
 
+                    <!-- Nombre Comercial -->
+                    <div class="md:col-span-2">
+                        <label for="nombre_comercial" class="block text-sm font-medium text-gray-700 mb-2">
+                            Nombre Comercial
+                        </label>
+                        <input type="text" 
+                               name="nombre_comercial" 
+                               id="nombre_comercial" 
+                               value="{{ old('nombre_comercial', $company->nombre_comercial ?? '') }}" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('nombre_comercial')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <!-- RUC -->
                     <div>
                         <label for="ruc" class="block text-sm font-medium text-gray-700 mb-2">
                             RUC <span class="text-red-500">*</span>
                         </label>
-                        <input type="text" 
-                               name="ruc" 
-                               id="ruc" 
-                               value="{{ old('ruc', $company->ruc ?? '') }}" 
-                               required
-                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <div class="flex gap-2">
+                            <input type="text" 
+                                   name="ruc" 
+                                   id="ruc" 
+                                   value="{{ old('ruc', $company->ruc ?? '') }}" 
+                                   required
+                                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" 
+                                    id="btn-consultar-ruc" 
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    title="Consultar RUC">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="ruc-loading" class="hidden mt-2 text-sm text-blue-600">
+                            Consultando...
+                        </div>
+                        <div id="ruc-error" class="hidden mt-2 text-sm text-red-600"></div>
                         @error('ruc')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -69,6 +98,101 @@
                                required
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         @error('direccion')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Ubigeo -->
+                    <div>
+                        <label for="ubigueo" class="block text-sm font-medium text-gray-700 mb-2">
+                            Ubigeo
+                        </label>
+                        <input type="text" 
+                               name="ubigueo" 
+                               id="ubigueo" 
+                               value="{{ old('ubigueo', $company->ubigueo ?? '') }}" 
+                               maxlength="6"
+                               placeholder="Ej: 140101"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('ubigueo')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Departamento -->
+                    <div>
+                        <label for="departamento" class="block text-sm font-medium text-gray-700 mb-2">
+                            Departamento
+                        </label>
+                        <input type="text" 
+                               name="departamento" 
+                               id="departamento" 
+                               value="{{ old('departamento', $company->departamento ?? '') }}" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('departamento')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Provincia -->
+                    <div>
+                        <label for="provincia" class="block text-sm font-medium text-gray-700 mb-2">
+                            Provincia
+                        </label>
+                        <input type="text" 
+                               name="provincia" 
+                               id="provincia" 
+                               value="{{ old('provincia', $company->provincia ?? '') }}" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('provincia')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Distrito -->
+                    <div>
+                        <label for="distrito" class="block text-sm font-medium text-gray-700 mb-2">
+                            Distrito
+                        </label>
+                        <input type="text" 
+                               name="distrito" 
+                               id="distrito" 
+                               value="{{ old('distrito', $company->distrito ?? '') }}" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('distrito')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Urbanización -->
+                    <div>
+                        <label for="urbanizacion" class="block text-sm font-medium text-gray-700 mb-2">
+                            Urbanización
+                        </label>
+                        <input type="text" 
+                               name="urbanizacion" 
+                               id="urbanizacion" 
+                               value="{{ old('urbanizacion', $company->urbanizacion ?? '-') }}" 
+                               placeholder="-"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('urbanizacion')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Código Local -->
+                    <div>
+                        <label for="cod_local" class="block text-sm font-medium text-gray-700 mb-2">
+                            Código Local
+                        </label>
+                        <input type="text" 
+                               name="cod_local" 
+                               id="cod_local" 
+                               value="{{ old('cod_local', $company->cod_local ?? '0000') }}" 
+                               maxlength="4"
+                               placeholder="0000"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        @error('cod_local')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
@@ -224,5 +348,110 @@
             </form>
         </div>
     </div>
+
+    <script>
+        // Función para inicializar el consultor de RUC
+        function initConsultarRuc() {
+            const btnConsultarRuc = document.getElementById('btn-consultar-ruc');
+            const inputRuc = document.getElementById('ruc');
+            const loadingDiv = document.getElementById('ruc-loading');
+            const errorDiv = document.getElementById('ruc-error');
+
+            if (!btnConsultarRuc || !inputRuc) return;
+
+            // Remover event listeners anteriores si existen
+            const newBtn = btnConsultarRuc.cloneNode(true);
+            btnConsultarRuc.parentNode.replaceChild(newBtn, btnConsultarRuc);
+
+            newBtn.addEventListener('click', function() {
+                const ruc = inputRuc.value.trim();
+                
+                if (!ruc) {
+                    errorDiv.textContent = 'Por favor ingrese un RUC';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Validar formato básico de RUC (11 dígitos)
+                if (!/^\d{11}$/.test(ruc)) {
+                    errorDiv.textContent = 'El RUC debe tener 11 dígitos';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Mostrar loading
+                loadingDiv.classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+                newBtn.disabled = true;
+
+                // Consultar API
+                fetch('{{ route("companies.consultarRuc") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ ruc: ruc })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loadingDiv.classList.add('hidden');
+                    newBtn.disabled = false;
+
+                    if (data.success) {
+                        // Llenar los campos con los datos obtenidos
+                        if (data.data.razon_social) {
+                            document.getElementById('razon_social').value = data.data.razon_social;
+                        }
+                        if (data.data.direccion) {
+                            document.getElementById('direccion').value = data.data.direccion;
+                        }
+                        if (data.data.ubigueo) {
+                            document.getElementById('ubigueo').value = data.data.ubigueo;
+                        }
+                        if (data.data.departamento) {
+                            document.getElementById('departamento').value = data.data.departamento;
+                        }
+                        if (data.data.provincia) {
+                            document.getElementById('provincia').value = data.data.provincia;
+                        }
+                        if (data.data.distrito) {
+                            document.getElementById('distrito').value = data.data.distrito;
+                        }
+                        if (data.data.urbanizacion) {
+                            document.getElementById('urbanizacion').value = data.data.urbanizacion;
+                        }
+                        if (data.data.cod_local) {
+                            document.getElementById('cod_local').value = data.data.cod_local;
+                        }
+                        
+                        // Opcional: también llenar nombre_comercial con la razón social
+                        if (data.data.razon_social && !document.getElementById('nombre_comercial').value) {
+                            document.getElementById('nombre_comercial').value = data.data.razon_social;
+                        }
+                    } else {
+                        errorDiv.textContent = data.message || 'No se encontró información para el RUC proporcionado';
+                        errorDiv.classList.remove('hidden');
+                    }
+                })
+                .catch(error => {
+                    loadingDiv.classList.add('hidden');
+                    newBtn.disabled = false;
+                    errorDiv.textContent = 'Error al consultar el RUC. Por favor intente nuevamente.';
+                    errorDiv.classList.remove('hidden');
+                    console.error('Error:', error);
+                });
+            });
+        }
+
+        // Ejecutar cuando se carga la página inicialmente
+        document.addEventListener('DOMContentLoaded', initConsultarRuc);
+        
+        // Ejecutar cuando Turbo carga una nueva página
+        document.addEventListener('turbo:load', initConsultarRuc);
+        
+        // También ejecutar en turbo:render por si acaso
+        document.addEventListener('turbo:render', initConsultarRuc);
+    </script>
 @endsection
 

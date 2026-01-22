@@ -3,8 +3,6 @@
 @section('content')
     <div class="w-full">
         <div class="bg-white rounded-lg shadow-sm p-6">
-            <h1 class="text-2xl font-bold text-gray-800 mb-6">Nueva Venta</h1>
-
             <!-- Mensajes de error -->
             @if($errors->any())
                 <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -28,22 +26,25 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- PRIMERA FILA: Productos -->
                     <div class="space-y-6">
-                        <!-- Título -->
-                        <div>
-                            <h2 class="text-xl font-bold text-gray-800 mb-2">Catálogo de Productos</h2>
-                            <p class="text-sm text-gray-600">Busca y selecciona productos para añadir al carrito</p>
-                        </div>
-
                         <!-- Buscador -->
                         <div>
-                            <div class="relative">
-                                <input type="text" 
-                                       id="searchProduct" 
-                                       placeholder="Buscar producto..." 
-                                       class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <svg class="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                </svg>
+                            <div class="flex items-center gap-3">
+                                <div class="relative flex-1">
+                                    <input type="text" 
+                                           id="searchProduct" 
+                                           placeholder="Buscar producto..." 
+                                           class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <svg class="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                </div>
+                                <!-- Toggle Switch -->
+                                <div class="flex items-center">
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="toggleSwitch" class="sr-only peer" />
+                                        <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -107,7 +108,7 @@
                             <!-- Input DNI/RUC (solo para Boleta/Factura) -->
                             <div id="cliente-documento-container" style="display: none;">
                                 <label for="numero_documento" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <span id="label-documento">DNI</span> <span class="text-red-500">*</span>
+                                    <span id="label-documento">DNI</span> <span id="asterisco-documento" class="text-red-500">*</span>
                                 </label>
                                 <div class="relative">
                                     <input type="text" 
@@ -126,6 +127,9 @@
                                 </div>
                                 <p class="mt-1 text-xs text-gray-500" id="hint-documento">
                                     Ingrese el número de documento del cliente
+                                </p>
+                                <p class="mt-1 text-xs text-blue-600 hidden" id="hint-boleta-simple">
+                                    <strong>Boleta Simple:</strong> Deje este campo vacío para generar una boleta sin documento del cliente
                                 </p>
                                 
                                 <!-- Información del cliente consultado -->
@@ -809,17 +813,40 @@
                     // Ocultar Cliente Genérico, mostrar input DNI/RUC
                     clienteGenericoContainer.style.display = 'none';
                     clienteDocumentoContainer.style.display = 'block';
-                    numeroDocumentoInput.setAttribute('required', 'required');
                     
                     // Cambiar label según tipo de comprobante
                     if (tipo === 'boleta') {
                         labelDocumento.textContent = 'DNI';
                         hintDocumento.textContent = 'Ingrese el DNI del cliente (8 dígitos)';
+                        hintDocumento.classList.remove('hidden');
+                        // Mostrar hint de boleta simple
+                        const hintBoletaSimple = document.getElementById('hint-boleta-simple');
+                        if (hintBoletaSimple) {
+                            hintBoletaSimple.classList.remove('hidden');
+                        }
+                        // Quitar requerido y asterisco para boletas (pueden ser simples)
+                        numeroDocumentoInput.removeAttribute('required');
+                        const asteriscoDocumento = document.getElementById('asterisco-documento');
+                        if (asteriscoDocumento) {
+                            asteriscoDocumento.style.display = 'none';
+                        }
                         numeroDocumentoInput.setAttribute('maxlength', '8');
                         numeroDocumentoInput.setAttribute('pattern', '[0-9]{8}');
                     } else if (tipo === 'factura') {
                         labelDocumento.textContent = 'RUC';
                         hintDocumento.textContent = 'Ingrese el RUC del cliente (11 dígitos)';
+                        hintDocumento.classList.remove('hidden');
+                        // Ocultar hint de boleta simple
+                        const hintBoletaSimple = document.getElementById('hint-boleta-simple');
+                        if (hintBoletaSimple) {
+                            hintBoletaSimple.classList.add('hidden');
+                        }
+                        // Facturas siempre requieren RUC
+                        numeroDocumentoInput.setAttribute('required', 'required');
+                        const asteriscoDocumento = document.getElementById('asterisco-documento');
+                        if (asteriscoDocumento) {
+                            asteriscoDocumento.style.display = 'inline';
+                        }
                         numeroDocumentoInput.setAttribute('maxlength', '11');
                         numeroDocumentoInput.setAttribute('pattern', '[0-9]{11}');
                     }
@@ -867,7 +894,17 @@
                             numero: numero
                         })
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        // Verificar si la respuesta es exitosa antes de parsear JSON
+                        if (!response.ok) {
+                            return response.json().then(data => {
+                                throw new Error(data.message || 'Error al consultar el documento');
+                            }).catch(() => {
+                                throw new Error('Error al consultar el documento. Verifique el número ingresado.');
+                            });
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         loadingElement.classList.add('hidden');
                         
@@ -881,7 +918,7 @@
                     .catch(error => {
                         loadingElement.classList.add('hidden');
                         console.error('Error:', error);
-                        mostrarErrorCliente('Error al consultar el documento. Intente nuevamente.');
+                        mostrarErrorCliente(error.message || 'Error al consultar el documento. Intente nuevamente.');
                     });
                 }, 500); // Esperar 500ms después de que el usuario deje de escribir
             }

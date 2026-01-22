@@ -40,6 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Rutas para Empresas
     Route::resource('companies', CompanyController::class);
+    Route::post('companies/consultar-ruc', [CompanyController::class, 'consultarRuc'])->name('companies.consultarRuc');
 
     // Rutas para Sucursales
     Route::resource('branches', BranchController::class);
@@ -80,6 +81,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Rutas para Ventas
     Route::resource('sales', SaleController::class);
     Route::post('sales/consultar-documento', [SaleController::class, 'consultarDocumento'])->name('sales.consultarDocumento');
+    Route::get('sales/{sale}/pdf', [SaleController::class, 'pdf'])->name('sales.pdf');
 
     // Rutas para Facturador
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
