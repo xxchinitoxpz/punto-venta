@@ -12,6 +12,7 @@ use Greenter\Model\Sale\FormaPagos\FormaPagoContado;
 use Greenter\Model\Sale\Invoice;
 use Greenter\Model\Sale\SaleDetail;
 use Greenter\Model\Sale\Legend;
+use Greenter\Model\Sale\Note;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
 use Greenter\Report\Resolver\DefaultTemplateResolver;
@@ -48,6 +49,48 @@ class SunatService
             ->setFechaEmision(new DateTime($data['fechaEmision'] ?? null)) // Zona horaria: Lima
             ->setFormaPago(new FormaPagoContado()) // FormaPago: Contado
             ->setTipoMoneda($data['tipoMoneda'] ?? null) // Sol - Catalog. 02
+            ->setCompany($this->getCompany($data['company']))
+            ->setClient($this->getClient($data['client']))
+
+            //Mto Operaciones
+            ->setMtoOperGravadas($data['mtoOperGravadas'] ?? null)
+            ->setMtoOperExoneradas($data['mtoOperExoneradas'] ?? null)
+            ->setMtoOperInafectas($data['mtoOperInafectas'] ?? null)
+            ->setMtoOperExportacion($data['mtoOperExportacion'] ?? null)
+            ->setMtoOperGratuitas($data['mtoOperGratuitas'] ?? null)
+
+            //Impuestos
+            ->setMtoIGV($data['mtoIGV'])
+            ->setMtoIGVGratuitas($data['mtoIGVGratuitas'])
+            ->setIcbper($data['icbper'])
+            ->setTotalImpuestos($data['totalImpuestos'])
+
+            //Totales
+            ->setValorVenta($data['valorVenta'])
+            ->setSubTotal($data['subTotal'])
+            ->setRedondeo($data['redondeo'])
+            ->setMtoImpVenta($data['mtoImpVenta'])
+
+            //Productos
+            ->setDetails($this->getDetails($data['details']))
+
+            //Leyendas
+            ->setLegends($this->getLegends($data['legends']));
+    }
+
+    public function getNote($data)
+    {
+        return (new Note())
+            ->setUblVersion($data['ublVersion'] ?? '2.1')
+            ->setTipoDoc($data['tipoDoc'] ?? null) // 07 nota de credito | 08 nota de debito
+            ->setSerie($data['serie'] ?? null)
+            ->setCorrelativo($data['correlativo'] ?? null)
+            ->setFechaEmision(new DateTime($data['fechaEmision'] ?? null)) // Zona horaria: Lima
+            ->setTipDocAfectado($data['tipDocAfectado'] ?? null) // 01 factura | 03 boleta
+            ->setNumDocfectado($data['numDocfectado'] ?? null) // serie y correlativo de la factura o boleta afectada ("F001-12")
+            ->setCodMotivo($data['codMotivo'] ?? null) // 01 Anulacion de la operacion
+            ->setDesMotivo($data['desMotivo'] ?? null) // "anulacion de la operacion"
+            ->setTipoMoneda($data['tipoMoneda'] ?? null)
             ->setCompany($this->getCompany($data['company']))
             ->setClient($this->getClient($data['client']))
 
@@ -231,6 +274,6 @@ class SunatService
 
         $pdf = $report->render($invoice, $params);
 
-        Storage::put('invoices/'.$invoice->getName().'.pdf', $pdf);
+        Storage::put('invoices/' . $invoice->getName() . '.pdf', $pdf);
     }
 }

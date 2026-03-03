@@ -9,6 +9,9 @@ class SunatResponse extends Model
 {
     protected $fillable = [
         'sale_id',
+        'tipo_documento',
+        'serie',
+        'correlativo',
         'estado',
         'codigo',
         'descripcion',

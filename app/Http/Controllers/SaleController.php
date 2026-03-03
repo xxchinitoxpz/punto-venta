@@ -429,16 +429,40 @@ class SaleController extends Controller
                 }
             }
 
-            // Eliminar movimientos de caja usando cash_box_movement_id
+            // Crear movimientos de salida para revertir los ingresos de la venta anulada
             foreach ($sale->payments as $payment) {
                 if ($payment->cash_box_movement_id) {
-                    CashBoxMovement::where('id', $payment->cash_box_movement_id)->delete();
+                    // Obtener el movimiento original
+                    $movementOriginal = CashBoxMovement::find($payment->cash_box_movement_id);
+                    
+                    if ($movementOriginal) {
+                        // Crear movimiento de salida que revierte el ingreso
+                        CashBoxMovement::create([
+                            'sesion_caja_id' => $movementOriginal->sesion_caja_id,
+                            'tipo' => 'salida',
+                            'monto' => $movementOriginal->monto, // Mismo monto pero como salida
+                            'metodo_pago' => $movementOriginal->metodo_pago,
+                            'descripcion' => 'Anulación de ' . $movementOriginal->descripcion,
+                            'origen_type' => Sale::class,
+                            'origen_id' => $sale->id,
+                        ]);
+                    }
                 }
             }
 
             DB::commit();
 
-            session()->flash('success', 'Venta anulada exitosamente. El stock y los movimientos de caja han sido revertidos.');
+            // Si era factura o boleta, emitir nota de crédito en SUNAT
+            if (in_array($sale->tipo_comprobante, ['factura', 'boleta'])) {
+                try {
+                    $this->enviarNotaCreditoSunat($sale);
+                } catch (\Exception $e) {
+                    \Log::error('Error al enviar Nota de Crédito a SUNAT: ' . $e->getMessage());
+                    session()->flash('warning', 'Venta anulada correctamente, pero no se pudo emitir la Nota de Crédito en SUNAT: ' . $e->getMessage());
+                }
+            }
+
+            session()->flash('success', 'Venta anulada exitosamente. El stock ha sido revertido y se registraron los movimientos de salida de caja.');
             return redirect()->route('sales.index');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -583,7 +607,93 @@ class SaleController extends Controller
         $response['hash'] = $hash;
 
         // Guardar respuesta en la base de datos
-        $this->guardarRespuestaSunat($sale, $response, $see);
+        $this->guardarRespuestaSunat($sale, $response, $see, 'comprobante');
+
+        return $response;
+    }
+
+    /**
+     * Emitir Nota de Crédito en SUNAT al anular una factura o boleta.
+     */
+    private function enviarNotaCreditoSunat(Sale $sale)
+    {
+        // Cargar relaciones necesarias
+        $sale->load([
+            'client',
+            'details',
+            'user.branch.company'
+        ]);
+
+        foreach ($sale->details as $detail) {
+            if ($detail->vendible_type === Presentation::class) {
+                $detail->load(['vendible.unitSunat', 'vendible.product']);
+            }
+        }
+
+        $company = $sale->user->branch->company;
+        if (!$company) {
+            throw new \Exception('No se encontró la empresa asociada a la sucursal.');
+        }
+
+        if (!$company->ruc || !$company->cert_path) {
+            throw new \Exception('La empresa no tiene configurado el RUC o certificado digital.');
+        }
+
+        if ($sale->tipo_comprobante === 'factura' && !$sale->client) {
+            throw new \Exception('Las facturas deben tener un cliente asociado con RUC.');
+        }
+
+        // Serie de documento para Nota de Crédito según tipo de comprobante anulado
+        $tipoSerieNc = $sale->tipo_comprobante === 'factura'
+            ? 'Nota de Crédito - Factura'
+            : 'Nota de Crédito - Boleta';
+
+        $documentSeries = DocumentSeries::where('sucursal_id', $sale->user->branch->id)
+            ->where('tipo_comprobante', $tipoSerieNc)
+            ->first();
+
+        if (!$documentSeries) {
+            throw new \Exception('No existe serie de documento configurada para "' . $tipoSerieNc . '" en esta sucursal.');
+        }
+
+        $correlativo = $documentSeries->ultimo_correlativo + 1;
+        $serieNc = $documentSeries->serie;
+
+        // Actualizar correlativo de la serie
+        $documentSeries->ultimo_correlativo = $correlativo;
+        $documentSeries->save();
+
+        // Mismo formato que factura/boleta (empresa, cliente, detalles)
+        $data = $this->saleToGreenterFormat($sale, $company);
+
+        // Datos específicos de la Nota de Crédito
+        $data['tipoDoc'] = '07'; // Nota de crédito
+        $data['serie'] = $serieNc;
+        $data['correlativo'] = (string) $correlativo;
+        $data['fechaEmision'] = now()->setTimezone('America/Lima')->format('c');
+        $data['tipDocAfectado'] = $sale->tipo_comprobante === 'factura' ? '01' : '03'; // 01 Factura, 03 Boleta
+        $data['numDocfectado'] = $sale->serie . '-' . $sale->correlativo;
+        $data['codMotivo'] = '01';
+        $data['desMotivo'] = 'Anulacion de la operacion';
+
+        $this->setTotales($data);
+        $this->setLegends($data);
+
+        $sunatService = new SunatService();
+        $see = $sunatService->getSee($company);
+        $note = $sunatService->getNote($data);
+
+        $result = $see->send($note);
+
+        $xml = $see->getFactory()->getLastXml();
+        $xmlUtils = new XmlUtils();
+        $hash = $xmlUtils->getHashSign($xml);
+
+        $response = $sunatService->sunatResponse($result);
+        $response['xml'] = $xml;
+        $response['hash'] = $hash;
+
+        $this->guardarRespuestaSunat($sale, $response, $see, 'nota_credito', $serieNc, (string) $correlativo);
 
         return $response;
     }
@@ -631,17 +741,43 @@ class SaleController extends Controller
             $sunatService = new SunatService();
             $invoice = $sunatService->getInvoice($data);
 
-            // Generar PDF
-            $htmlReport = new \Greenter\Report\HtmlReport();
-            $resolver = new \Greenter\Report\Resolver\DefaultTemplateResolver();
-            $htmlReport->setTemplate($resolver->getTemplate($invoice));
+            // Generar PDF con template personalizado tipo ticket
+            $templatesDir = resource_path('templates/greenter');
+            
+            // Configurar cache de Twig: habilitado en producción, deshabilitado en desarrollo
+            $twigOptions = [
+                'strict_variables' => true,
+            ];
+            
+            // Solo habilitar cache en producción para mejor rendimiento
+            if (app()->environment('production')) {
+                $cacheDir = storage_path('framework/cache/twig');
+                // Asegurar que el directorio de cache existe
+                if (!is_dir($cacheDir)) {
+                    mkdir($cacheDir, 0755, true);
+                }
+                $twigOptions['cache'] = $cacheDir;
+            } else {
+                // En desarrollo, deshabilitar cache para ver cambios inmediatamente
+                $twigOptions['cache'] = false;
+            }
+            
+            $htmlReport = new \Greenter\Report\HtmlReport($templatesDir, $twigOptions);
+            
+            // Determinar el template según el tipo de comprobante
+            $templateName = $sale->tipo_comprobante === 'factura' ? 'invoice.html.twig' : 'boleta.html.twig';
+            $htmlReport->setTemplate($templateName);
 
             $report = new \Greenter\Report\PdfReport($htmlReport);
             $report->setOptions([
                 'no-outline',
-                'viewport-size' => '1280x1024',
-                'page-width' => '21cm',
-                'page-height' => '29.7cm',
+                'viewport-size' => '800x1200',
+                'page-width' => '80mm',
+                'page-height' => '297mm', // Altura automática
+                'margin-top' => '0mm',
+                'margin-right' => '0mm',
+                'margin-bottom' => '0mm',
+                'margin-left' => '0mm',
             ]);
             $report->setBinPath(env('WKHTMLTOPDF_PATH'));
 
@@ -702,6 +838,125 @@ class SaleController extends Controller
                 ->header('Content-Disposition', 'inline; filename="' . $nombreArchivo . '"');
         } catch (\Exception $e) {
             return back()->with('error', 'Error al generar el PDF: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generar PDF de la Nota de Crédito (por SunatResponse).
+     */
+    public function notaCreditoPdf(SunatResponse $sunatResponse)
+    {
+        if ($sunatResponse->tipo_documento !== 'nota_credito') {
+            return back()->with('error', 'El documento no es una nota de crédito.');
+        }
+
+        $sale = $sunatResponse->sale;
+        if (!$sale) {
+            return back()->with('error', 'No se encontró la venta asociada.');
+        }
+
+        $serieNc = $sunatResponse->serie;
+        $correlativoNc = $sunatResponse->correlativo;
+        if (empty($serieNc) || $correlativoNc === null || $correlativoNc === '') {
+            return back()->with('error', 'Faltan serie o correlativo de la nota de crédito.');
+        }
+
+        try {
+            $sale->load([
+                'client',
+                'details',
+                'user.branch.company',
+            ]);
+            foreach ($sale->details as $detail) {
+                if ($detail->vendible_type === Presentation::class) {
+                    $detail->load(['vendible.unitSunat', 'vendible.product']);
+                }
+            }
+
+            $company = $sale->user->branch->company;
+            if (!$company) {
+                return back()->with('error', 'No se encontró la empresa asociada.');
+            }
+
+            $data = $this->saleToGreenterFormat($sale, $company);
+            $data['tipoDoc'] = '07';
+            $data['serie'] = $serieNc;
+            $data['correlativo'] = (string) $correlativoNc;
+            $data['fechaEmision'] = $sunatResponse->created_at->setTimezone('America/Lima')->format('c');
+            $data['tipDocAfectado'] = $sale->tipo_comprobante === 'factura' ? '01' : '03';
+            $data['numDocfectado'] = $sale->serie . '-' . $sale->correlativo;
+            $data['codMotivo'] = '01';
+            $data['desMotivo'] = 'Anulacion de la operacion';
+
+            $this->setTotales($data);
+            $this->setLegends($data);
+
+            $sunatService = new SunatService();
+            $note = $sunatService->getNote($data);
+
+            $templatesDir = resource_path('templates/greenter');
+            $twigOptions = ['strict_variables' => true];
+            if (app()->environment('production')) {
+                $cacheDir = storage_path('framework/cache/twig');
+                if (!is_dir($cacheDir)) {
+                    mkdir($cacheDir, 0755, true);
+                }
+                $twigOptions['cache'] = $cacheDir;
+            } else {
+                $twigOptions['cache'] = false;
+            }
+
+            $htmlReport = new \Greenter\Report\HtmlReport($templatesDir, $twigOptions);
+            $htmlReport->setTemplate('boleta.html.twig');
+
+            $report = new \Greenter\Report\PdfReport($htmlReport);
+            $report->setOptions([
+                'no-outline',
+                'viewport-size' => '800x1200',
+                'page-width' => '80mm',
+                'page-height' => '297mm',
+                'margin-top' => '0mm',
+                'margin-right' => '0mm',
+                'margin-bottom' => '0mm',
+                'margin-left' => '0mm',
+            ]);
+            $report->setBinPath(env('WKHTMLTOPDF_PATH'));
+
+            $hash = !empty($sunatResponse->hash) ? (string) $sunatResponse->hash : 'qqnr2dN4p/HmaEA/CJuVGo7dv5g=';
+
+            $logo = null;
+            if (!empty($company->logo_path)) {
+                try {
+                    if (Storage::disk('public')->exists($company->logo_path)) {
+                        $logo = Storage::disk('public')->get($company->logo_path);
+                    } elseif (Storage::exists($company->logo_path)) {
+                        $logo = Storage::get($company->logo_path);
+                    }
+                } catch (\Exception $e) {
+                    $logo = null;
+                }
+            }
+
+            $params = [
+                'system' => ['logo' => $logo, 'hash' => $hash],
+                'user' => [
+                    'header' => !empty($company->telefono) ? 'Telf: <b>' . htmlspecialchars((string)$company->telefono) . '</b>' : '',
+                    'extras' => [
+                        ['name' => 'CONDICION DE PAGO', 'value' => 'Efectivo'],
+                        ['name' => 'VENDEDOR', 'value' => htmlspecialchars((string)($sale->user->name ?? 'N/A'))],
+                    ],
+                    'footer' => !empty($company->resolucion) ? '<p>Nro Resolucion: <b>' . htmlspecialchars((string)$company->resolucion) . '</b></p>' : '',
+                ],
+            ];
+
+            $pdf = $report->render($note, $params);
+            $nombreArchivo = 'NC-' . $serieNc . '-' . str_pad($correlativoNc, 8, '0', STR_PAD_LEFT) . '.pdf';
+
+            return response($pdf, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $nombreArchivo . '"');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al generar el PDF de la nota de crédito: ' . $e->getMessage());
         }
     }
 
@@ -861,7 +1116,7 @@ class SaleController extends Controller
     /**
      * Guardar respuesta de SUNAT en la base de datos
      */
-    private function guardarRespuestaSunat(Sale $sale, array $response, $see)
+    private function guardarRespuestaSunat(Sale $sale, array $response, $see, string $tipoDocumento = 'comprobante', ?string $documentoSerie = null, ?string $documentoCorrelativo = null)
     {
         $estado = null;
         $codigo = null;
@@ -918,6 +1173,9 @@ class SaleController extends Controller
         // Guardar en la base de datos
         SunatResponse::create([
             'sale_id' => $sale->id,
+            'tipo_documento' => $tipoDocumento,
+            'serie' => $documentoSerie,
+            'correlativo' => $documentoCorrelativo,
             'estado' => $estado,
             'codigo' => $codigo,
             'descripcion' => $descripcion,

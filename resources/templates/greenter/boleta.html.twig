@@ -1,0 +1,289 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <style type="text/css">
+        {% include 'assets/style.css' %}
+        /* Estilos adicionales para formato ticket */
+        body {
+            width: 80mm;
+            margin: 0 auto;
+            padding: 5mm;
+            font-size: 9px;
+        }
+        .ticket-divider {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .ticket-center {
+            text-align: center;
+        }
+        .ticket-right {
+            text-align: right;
+        }
+        .ticket-bold {
+            font-weight: bold;
+        }
+        .ticket-logo {
+            max-width: 100%;
+            height: auto;
+            max-height: 40px;
+        }
+        .ticket-product {
+            font-size: 8px;
+        }
+        .ticket-total {
+            font-size: 12px;
+            font-weight: bold;
+            border-top: 2px solid #000;
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+        .ticket-footer {
+            font-size: 7px;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .ticket-qr {
+            text-align: center;
+            margin: 5px 0;
+        }
+        .ticket-qr img {
+            max-width: 60px;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="white-bg">
+{% set cp = doc.company %}
+{% set isInvoice = doc.tipoDoc in ['01', '03'] %}
+{% set isNota = doc.tipoDoc in ['07', '08'] %}
+{% set isAnticipo = doc.totalAnticipos is defined and doc.totalAnticipos > 0 %}
+{% set name = doc.tipoDoc|catalog('01') %}
+{% set cl = doc.client %}
+{% set moneda = doc.tipoMoneda|catalog('02') %}
+
+<!-- Logo y Empresa -->
+<div class="ticket-center">
+    {% if params.system.logo is defined and params.system.logo %}
+    <div class="ticket-qr">
+        <img src="{{ params.system.logo|image_b64 }}" class="ticket-logo" alt="Logo">
+    </div>
+    {% endif %}
+    <div class="ticket-bold" style="font-size: 11px; margin: 3px 0;">{{ cp.razonSocial }}</div>
+    <div>RUC: {{ cp.ruc }}</div>
+    <div style="font-size: 8px;">{{ cp.address.direccion }}</div>
+    {% if cp.address.distrito %}
+    <div style="font-size: 8px;">{{ cp.address.distrito }}, {{ cp.address.provincia }}</div>
+    {% endif %}
+    {% if params.user.header %}
+    <div style="font-size: 8px; margin-top: 3px;">{{ params.user.header|raw }}</div>
+    {% endif %}
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Tipo de Comprobante -->
+<div class="ticket-center">
+    <div class="ticket-bold" style="font-size: 12px;">{{ name }}</div>
+    <div style="font-size: 9px;">ELECTRÓNICA</div>
+    <div class="ticket-bold" style="font-size: 14px;">{{ doc.serie }}-{{ doc.correlativo }}</div>
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Cliente -->
+<div>
+    <div class="ticket-bold">Cliente:</div>
+    <div>{{ cl.rznSocial }}</div>
+    {% if cl.tipoDoc != '-' and cl.numDoc != '-' %}
+    <div>{{ cl.tipoDoc|catalog('06') }}: {{ cl.numDoc }}</div>
+    {% endif %}
+    {% if cl.address and cl.address.direccion %}
+    <div style="font-size: 8px;">{{ cl.address.direccion }}</div>
+    {% endif %}
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Fecha -->
+<div>
+    <div><span class="ticket-bold">Fecha:</span> {{ doc.fechaEmision|date('d/m/Y') }}
+    {% if doc.fechaEmision|date('H:i:s') != '00:00:00' %} {{ doc.fechaEmision|date('H:i:s') }}{% endif %}</div>
+    {% if doc.fecVencimiento is defined and doc.fecVencimiento %}
+    <div><span class="ticket-bold">Vencimiento:</span> {{ doc.fecVencimiento|date('d/m/Y') }}</div>
+    {% endif %}
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Productos -->
+<div>
+    <table width="100%" border="0" cellpadding="2" cellspacing="0">
+        <tr>
+            <td class="ticket-bold ticket-center" style="width: 15%;">Cant.</td>
+            <td class="ticket-bold ticket-center" style="width: 50%;">Descripción</td>
+            <td class="ticket-bold ticket-right" style="width: 35%;">Total</td>
+        </tr>
+        {% for det in doc.details %}
+        <tr class="border_top">
+            <td class="ticket-center ticket-product">{{ det.cantidad|n_format }} {{ det.unidad }}</td>
+            <td class="ticket-product">
+                {% set desc = det.descripcion %}
+                {% if desc|length > 30 %}
+                    {{ desc|slice(0, 30) }}...
+                {% else %}
+                    {{ desc }}
+                {% endif %}
+            </td>
+            <td class="ticket-right ticket-product">{{ moneda }} {{ det.mtoPrecioUnitario|n_format }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Totales -->
+<div>
+    {% if isAnticipo %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Total Anticipo:</span> {{ moneda }} {{ doc.totalAnticipos|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOperGravadas %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Op. Gravadas:</span> {{ moneda }} {{ doc.mtoOperGravadas|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOperInafectas %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Op. Inafectas:</span> {{ moneda }} {{ doc.mtoOperInafectas|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOperExoneradas %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Op. Exoneradas:</span> {{ moneda }} {{ doc.mtoOperExoneradas|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOperGratuitas %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Op. Gratuitas:</span> {{ moneda }} {{ doc.mtoOperGratuitas|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOperExportacion %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Op. Exportación:</span> {{ moneda }} {{ doc.mtoOperExportacion|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoBaseIvap %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Base IVAP:</span> {{ moneda }} {{ doc.mtoBaseIvap|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoIGVGratuitas %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">IGV Gratuito:</span> {{ moneda }} {{ doc.mtoIGVGratuitas|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoIGV %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">I.G.V.{% if params.user.numIGV is defined %} {{ params.user.numIGV }}%{% endif %}:</span> {{ moneda }} {{ doc.mtoIGV|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoIvap %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">IVAP:</span> {{ moneda }} {{ doc.mtoIvap|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.icbper %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">I.C.B.P.E.R.:</span> {{ moneda }} {{ doc.icbper|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoISC %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">I.S.C.:</span> {{ moneda }} {{ doc.mtoISC|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.sumOtrosCargos %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Otros Cargos:</span> {{ moneda }} {{ doc.sumOtrosCargos|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.mtoOtrosTributos %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Otros Tributos:</span> {{ moneda }} {{ doc.mtoOtrosTributos|n_format }}
+    </div>
+    {% endif %}
+    {% if doc.redondeo %}
+    <div class="ticket-right" style="font-size: 9px;">
+        <span class="ticket-bold">Redondeo:</span> {{ moneda }} {{ doc.redondeo|n_format }}
+    </div>
+    {% endif %}
+    <div class="ticket-total ticket-right">
+        <span class="ticket-bold">TOTAL:</span> {{ moneda }} {{ doc.mtoImpVenta|n_format }}
+    </div>
+    {% if doc.perception and doc.perception.mto %}
+        {% set perc = doc.perception %}
+        {% set soles = 'PEN'|catalog('02') %}
+        <div class="ticket-right" style="font-size: 9px;">
+            <span class="ticket-bold">Percepción:</span> {{ soles }} {{ perc.mto|n_format }}
+        </div>
+        <div class="ticket-total ticket-right">
+            <span class="ticket-bold">Total a Pagar:</span> {{ soles }} {{ perc.mtoTotal|n_format }}
+        </div>
+    {% endif %}
+</div>
+
+<div class="ticket-divider"></div>
+
+<!-- Monto en Letras -->
+{% if legend(doc.legends, '1000') %}
+<div class="ticket-center" style="font-size: 8px; margin: 5px 0;">
+    <span class="ticket-bold">{{ legend(doc.legends, '1000') }}</span>
+</div>
+<div class="ticket-divider"></div>
+{% endif %}
+
+<!-- Información Adicional -->
+{% if params.user.extras is defined %}
+<div style="font-size: 8px; margin-top: 3px;">
+    {% for item in params.user.extras %}
+    <div><span class="ticket-bold">{{ item.name|upper }}:</span> {{ item.value }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Leyendas -->
+{% if doc.legends %}
+<div style="font-size: 7px; margin-top: 3px;">
+    {% for leg in doc.legends %}
+        {% if leg.code != '1000' %}
+        <div>{{ leg.value }}</div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="ticket-divider"></div>
+
+<!-- Hash y QR -->
+<div class="ticket-footer">
+    {% if params.user.footer is defined %}
+    <div style="font-size: 7px; margin-bottom: 3px;">{{ params.user.footer|raw }}</div>
+    {% endif %}
+    {% if params.system.hash is defined and params.system.hash %}
+    <div style="font-size: 7px; word-break: break-all; margin-bottom: 3px;">
+        <span class="ticket-bold">Resumen:</span> {{ params.system.hash }}
+    </div>
+    {% endif %}
+    <div class="ticket-qr">
+        <img src="{{ qrCode(doc)|image_b64('svg+xml') }}" alt="QR Code">
+    </div>
+    <div style="font-size: 7px; margin-top: 3px;">
+        Representación Impresa de la {{ name }} ELECTRÓNICA
+    </div>
+</div>
+
+</body>
+</html>

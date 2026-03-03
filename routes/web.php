@@ -15,6 +15,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\CashBoxController;
 use App\Http\Controllers\greenter\InvoiceController;
+use App\Http\Controllers\FacturadorController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\SaleController;
 use Illuminate\Support\Facades\Route;
@@ -83,7 +84,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('sales/consultar-documento', [SaleController::class, 'consultarDocumento'])->name('sales.consultarDocumento');
     Route::get('sales/{sale}/pdf', [SaleController::class, 'pdf'])->name('sales.pdf');
 
-    // Rutas para Facturador
+    // Facturador: listado de facturas, boletas y notas de crédito
+    Route::get('facturador', [FacturadorController::class, 'index'])->name('facturador.index');
+    Route::get('facturador/nota/{sunatResponse}/pdf', [SaleController::class, 'notaCreditoPdf'])->name('facturador.notaPdf');
+
+    // Rutas para Facturador (envío manual)
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::post('invoices/send', [InvoiceController::class, 'send'])->name('invoices.send');
     Route::post('invoices/xml', [InvoiceController::class, 'xml'])->name('invoices.xml');
